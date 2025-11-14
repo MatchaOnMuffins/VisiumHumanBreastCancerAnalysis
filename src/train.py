@@ -1,9 +1,18 @@
 import torch
 from torch.utils.data import DataLoader, TensorDataset
-from .model import compute_loss
+from .loss import spatial_vae_loss
 
 
-def train_model(model, X, edge_index, n_epochs=50, batch_size=256, lr=1e-3, lambda_spatial=5.0, device="cpu"):
+def train_model(
+    model,
+    X,
+    edge_index,
+    n_epochs=50,
+    batch_size=256,
+    lr=1e-3,
+    lambda_spatial=5.0,
+    device="cpu",
+):
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
@@ -22,7 +31,7 @@ def train_model(model, X, edge_index, n_epochs=50, batch_size=256, lr=1e-3, lamb
 
         for (batch_data,) in data_loader:
             reconstruction, mu, logvar, latent = model(batch_data)
-            total_loss, recon_loss, kl_loss, _ = compute_loss(
+            total_loss, recon_loss, kl_loss, _ = spatial_vae_loss(
                 reconstruction, batch_data, mu, logvar, latent
             )
 
@@ -43,13 +52,18 @@ def train_model(model, X, edge_index, n_epochs=50, batch_size=256, lr=1e-3, lamb
         model.eval()
         with torch.no_grad():
             reconstruction, mu, logvar, latent = model(full_data)
-            eval_total, eval_recon, eval_kl, eval_spatial = compute_loss(
-                reconstruction, full_data, mu, logvar, latent,
-                edge_index=edge_index_gpu, lambda_spatial=lambda_spatial
+            eval_total, eval_recon, eval_kl, eval_spatial = spatial_vae_loss(
+                reconstruction,
+                full_data,
+                mu,
+                logvar,
+                latent,
+                edge_index=edge_index_gpu,
+                lambda_spatial=lambda_spatial,
             )
 
         print(
-            f"Epoch {epoch+1:03d} | "
+            f"Epoch {epoch + 1:03d} | "
             f"Train: {train_total:.4f} (R:{train_recon:.4f} KL:{train_kl:.4f}) | "
             f"Eval: {eval_total.item():.4f} (R:{eval_recon.item():.4f} KL:{eval_kl.item():.4f} S:{eval_spatial.item():.4f})"
         )

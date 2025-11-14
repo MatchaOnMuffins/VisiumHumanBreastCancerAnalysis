@@ -20,16 +20,18 @@ def main(config_path: str = "config.yaml"):
 
     print("\n1. Loading data...")
     adata = load_visium_data(config.data_dir, config.counts_file)
-    expression_matrix = adata.X.toarray() # type: ignore
+    expression_matrix = adata.X.toarray()  # type: ignore
     spatial_coordinates = adata.obsm["spatial"].astype("float32")
-    print(f"   Loaded {expression_matrix.shape[0]} spots, {expression_matrix.shape[1]} genes")
+    print(
+        f"   Loaded {expression_matrix.shape[0]} spots, {expression_matrix.shape[1]} genes"
+    )
 
     print("\n2. Preprocessing expression data...")
     pca_features = preprocess_expression(
         expression_matrix,
         min_spots=config.min_spots_per_gene,
         n_top_genes=config.top_genes_count,
-        n_pca_components=config.pca_components
+        n_pca_components=config.pca_components,
     )
     print(f"   PCA shape: {pca_features.shape}")
 
@@ -41,21 +43,25 @@ def main(config_path: str = "config.yaml"):
     model = SpatialVAE(
         in_dim=pca_features.shape[1],
         latent_dim=config.latent_dimensions,
-        hidden_dims=config.hidden_layer_dimensions
+        hidden_dims=config.hidden_layer_dimensions,
     )
     embeddings = train_model(
-        model, pca_features, edge_index,
+        model,
+        pca_features,
+        edge_index,
         n_epochs=config.training_epochs,
         batch_size=config.batch_size,
         lr=config.learning_rate,
         lambda_spatial=config.spatial_regularization_weight,
-        device=device
+        device=device,
     )
 
     print("\n5. Clustering and visualization...")
     adata.obsm["X_spatial_vae"] = StandardScaler().fit_transform(embeddings)
 
-    sc.pp.neighbors(adata, use_rep="X_spatial_vae", n_neighbors=config.cluster_neighbors)
+    sc.pp.neighbors(
+        adata, use_rep="X_spatial_vae", n_neighbors=config.cluster_neighbors
+    )
     sc.tl.leiden(adata)
     sc.tl.umap(adata)
 
@@ -72,7 +78,7 @@ if __name__ == "__main__":
         "--config",
         type=str,
         default="config.yaml",
-        help="Path to configuration YAML file (default: config.yaml)"
+        help="Path to configuration YAML file (default: config.yaml)",
     )
     args = parser.parse_args()
 

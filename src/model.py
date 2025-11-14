@@ -1,93 +1,105 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from typing import Tuple, Optional
+
+
+class Encoder(nn.Module):
+    def __init__(self, in_dim: int, hidden_dims: Tuple[int, ...], latent_dim: int):
+        super().__init__()
+
+        layers = []
+        current = in_dim
+        for h in hidden_dims:
+            layers.append(nn.Linear(current, h))
+            layers.append(nn.ReLU())
+            current = h
+
+        self.backbone = nn.Sequential(*layers)
+        self.mu = nn.Linear(current, latent_dim)
+        self.logvar = nn.Linear(current, latent_dim)
+
+    def forward(self, x: torch.Tensor):
+        h = self.backbone(x)
+        return self.mu(h), self.logvar(h)
+
+
+class Decoder(nn.Module):
+    def __init__(self, latent_dim: int, hidden_dims: Tuple[int, ...], out_dim: int):
+        super().__init__()
+
+        layers = []
+        current = latent_dim
+        for h in reversed(hidden_dims):
+            layers.append(nn.Linear(current, h))
+            layers.append(nn.ReLU())
+            current = h
+
+        layers.append(nn.Linear(current, out_dim))
+        self.backbone = nn.Sequential(*layers)
+
+    def forward(self, z: torch.Tensor):
+        return self.backbone(z)
 
 
 class SpatialVAE(nn.Module):
-    """Variational Autoencoder with spatial smoothness regularization."""
 
-    def __init__(self, in_dim, latent_dim=64, hidden_dims=(512, 256)):
+    def __init__(self, in_dim: int, latent_dim: int = 64, hidden_dims: Tuple[int, ...] = (512, 256)):
         super().__init__()
         self.in_dim = in_dim
         self.latent_dim = latent_dim
 
-        self.encoder = self._build_encoder(in_dim, hidden_dims)
-        encoder_output_dim = hidden_dims[-1]
+        self.encoder = Encoder(in_dim, hidden_dims, latent_dim)
+        self.decoder = Decoder(latent_dim, hidden_dims, in_dim)
 
-        self.mu_layer = nn.Linear(encoder_output_dim, latent_dim)
-        self.logvar_layer = nn.Linear(encoder_output_dim, latent_dim)
+    def encode(self, x: torch.Tensor):
+        return self.encoder(x)
 
-        self.decoder = self._build_decoder(latent_dim, hidden_dims, in_dim)
+    def reparameterize(self, mu: torch.Tensor, logvar: torch.Tensor):
+        eps = torch.randn_like(logvar)
+        return mu + eps * torch.exp(0.5 * logvar)
 
-    def _build_encoder(self, input_dim, hidden_dims):
-        layers = []
-        current_dim = input_dim
-
-        for hidden_dim in hidden_dims:
-            layers.extend([
-                nn.Linear(current_dim, hidden_dim),
-                nn.ReLU()
-            ])
-            current_dim = hidden_dim
-
-        return nn.Sequential(*layers)
-
-    def _build_decoder(self, latent_dim, hidden_dims, output_dim):
-        layers = []
-        current_dim = latent_dim
-
-        for hidden_dim in reversed(hidden_dims):
-            layers.extend([
-                nn.Linear(current_dim, hidden_dim),
-                nn.ReLU()
-            ])
-            current_dim = hidden_dim
-
-        layers.append(nn.Linear(current_dim, output_dim))
-        return nn.Sequential(*layers)
-
-    def encode(self, x):
-        encoded = self.encoder(x)
-        return self.mu_layer(encoded), self.logvar_layer(encoded)
-
-    def reparameterize(self, mu, logvar):
-        standard_deviation = torch.exp(0.5 * logvar)
-        epsilon = torch.randn_like(standard_deviation)
-        return mu + epsilon * standard_deviation
-
-    def decode(self, z):
+    def decode(self, z: torch.Tensor):
         return self.decoder(z)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
-        reconstruction = self.decode(z)
-        return reconstruction, mu, logvar, z
+        recon = self.decode(z)
+        return recon, mu, logvar, z
 
 
-def spatial_smoothness_loss(latent_embeddings, edge_index):
-    """Compute mean squared distance between connected nodes in latent space."""
-    source_nodes, target_nodes = edge_index
-    differences = latent_embeddings[source_nodes] - latent_embeddings[target_nodes]
-    return differences.pow(2).sum(dim=1).mean()
+def spatial_smoothness_loss(latent_embeddings: torch.Tensor, edge_index: torch.Tensor):
+    src, dst = edge_index
+    diffs = latent_embeddings[src] - latent_embeddings[dst]
+    return diffs.pow(2).sum(dim=1).mean()
 
 
-def compute_reconstruction_loss(reconstructed, original):
+def reconstruction_loss(reconstructed: torch.Tensor, original: torch.Tensor):
     return F.mse_loss(reconstructed, original, reduction="mean")
 
 
-def compute_kl_divergence(mu, logvar):
-    return -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
+def kl_divergence(mu: torch.Tensor, logvar: torch.Tensor):
+    return 0.5 * (mu.pow(2) + logvar.exp() - 1 - logvar).mean()
 
 
-def compute_loss(reconstructed, original, mu, logvar, latent_embeddings, edge_index=None, lambda_spatial=0.0):
-    """Compute VAE loss with optional spatial smoothness term."""
-    reconstruction_loss = compute_reconstruction_loss(reconstructed, original)
-    kl_divergence = compute_kl_divergence(mu, logvar)
+def compute_loss(
+    reconstructed: torch.Tensor,
+    original: torch.Tensor,
+    mu: torch.Tensor,
+    logvar: torch.Tensor,
+    latent_embeddings: torch.Tensor,
+    edge_index: Optional[torch.Tensor] = None,
+    lambda_spatial: float = 0.0,
+):
+    recon_loss = reconstruction_loss(reconstructed, original)
+    kl_div = kl_divergence(mu, logvar)
 
-    spatial_loss = torch.tensor(0.0, device=original.device)
-    if edge_index is not None and lambda_spatial > 0:
-        spatial_loss = spatial_smoothness_loss(latent_embeddings, edge_index)
+    spatial = (
+        spatial_smoothness_loss(latent_embeddings, edge_index)
+        if edge_index is not None
+        else original.new_zeros(())
+    )
 
-    total_loss = reconstruction_loss + kl_divergence + lambda_spatial * spatial_loss
-    return total_loss, reconstruction_loss, kl_divergence, spatial_loss
+    total = recon_loss + kl_div + lambda_spatial * spatial
+    return total, recon_loss, kl_div, spatial

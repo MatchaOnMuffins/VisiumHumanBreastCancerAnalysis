@@ -26,76 +26,47 @@ SPATIAL_REGULARIZATION_WEIGHT = 3.0
 CLUSTER_NEIGHBORS = 15
 
 
-def load_and_prepare_data(data_directory, counts_filename):
+def main():
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device}")
+
     print("\n1. Loading data...")
-    adata = load_visium_data(data_directory, counts_filename)
+    adata = load_visium_data(DATA_DIR, COUNTS_FILE)
     expression_matrix = adata.X.toarray() # type: ignore
     spatial_coordinates = adata.obsm["spatial"].astype("float32")
     print(f"   Loaded {expression_matrix.shape[0]} spots, {expression_matrix.shape[1]} genes")
-    return adata, expression_matrix, spatial_coordinates
 
-
-def create_expression_features(expression_matrix, min_spots, top_genes, pca_components):
     print("\n2. Preprocessing expression data...")
     pca_features = preprocess_expression(
         expression_matrix,
-        min_spots=min_spots,
-        n_top_genes=top_genes,
-        n_pca_components=pca_components
+        min_spots=MIN_SPOTS_PER_GENE,
+        n_top_genes=TOP_GENES_COUNT,
+        n_pca_components=PCA_COMPONENTS
     )
     print(f"   PCA shape: {pca_features.shape}")
-    return pca_features
 
-
-def create_spatial_graph(coordinates, neighbors):
     print("\n3. Building spatial k-NN graph...")
-    edge_index = build_spatial_graph(coordinates, k=neighbors)
+    edge_index = build_spatial_graph(spatial_coordinates, k=SPATIAL_NEIGHBORS)
     print(f"   Graph edges: {edge_index.shape[1]}")
-    return edge_index
 
-
-def train_spatial_vae(pca_features, edge_index, latent_dim, hidden_dims, epochs, batch_size, lr, lambda_spatial, device):
     print("\n4. Training Spatial VAE...")
-    model = SpatialVAE(in_dim=pca_features.shape[1], latent_dim=latent_dim, hidden_dims=hidden_dims)
+    model = SpatialVAE(in_dim=pca_features.shape[1], latent_dim=LATENT_DIMENSIONS, hidden_dims=HIDDEN_LAYER_DIMENSIONS)
     embeddings = train_model(
         model, pca_features, edge_index,
-        n_epochs=epochs, batch_size=batch_size, lr=lr,
-        lambda_spatial=lambda_spatial, device=device
+        n_epochs=TRAINING_EPOCHS, batch_size=BATCH_SIZE, lr=LEARNING_RATE,
+        lambda_spatial=SPATIAL_REGULARIZATION_WEIGHT, device=device
     )
-    return embeddings
 
-
-def cluster_and_visualize(adata, embeddings, neighbors):
     print("\n5. Clustering and visualization...")
     adata.obsm["X_spatial_vae"] = StandardScaler().fit_transform(embeddings)
 
-    sc.pp.neighbors(adata, use_rep="X_spatial_vae", n_neighbors=neighbors)
+    sc.pp.neighbors(adata, use_rep="X_spatial_vae", n_neighbors=CLUSTER_NEIGHBORS)
     sc.tl.leiden(adata)
     sc.tl.umap(adata)
 
     print("\n6. Generating plots...")
     sc.pl.spatial(adata, color="leiden", title="Spatial clusters")
     sc.pl.umap(adata, color="leiden", title="UMAP of latent space")
-
-
-def main():
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Using device: {device}")
-
-    adata, expression_matrix, spatial_coordinates = load_and_prepare_data(DATA_DIR, COUNTS_FILE)
-
-    pca_features = create_expression_features(
-        expression_matrix, MIN_SPOTS_PER_GENE, TOP_GENES_COUNT, PCA_COMPONENTS
-    )
-
-    edge_index = create_spatial_graph(spatial_coordinates, SPATIAL_NEIGHBORS)
-
-    embeddings = train_spatial_vae(
-        pca_features, edge_index, LATENT_DIMENSIONS, HIDDEN_LAYER_DIMENSIONS,
-        TRAINING_EPOCHS, BATCH_SIZE, LEARNING_RATE, SPATIAL_REGULARIZATION_WEIGHT, device
-    )
-
-    cluster_and_visualize(adata, embeddings, CLUSTER_NEIGHBORS)
 
     print("\nDone!")
 

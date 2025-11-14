@@ -14,9 +14,9 @@ model:
 
 training:
   epochs: 50
-  batch_size: 256
   learning_rate: 0.001
-  spatial_regularization_weight: 3.0
+  spatial_regularization_weight: 0.1
+  beta: 1
 
 clustering:
   n_neighbors: 15

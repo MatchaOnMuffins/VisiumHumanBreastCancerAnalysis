@@ -5,10 +5,14 @@ import torch
 import scanpy as sc
 from sklearn.preprocessing import StandardScaler
 
-from src.data import load_visium_data, preprocess_expression, build_spatial_graph
-from src.model import SpatialVAE
-from src.train import train_model
-from src.config import load_config
+from src.dataloader.data import (
+    load_visium_data,
+    preprocess_expression,
+    build_spatial_graph,
+)
+from src.model.model import SpatialVAE
+from src.training.train import train_model
+from src.config.config import load_config
 
 
 def main(config_path: str = "config.yaml"):
@@ -50,7 +54,6 @@ def main(config_path: str = "config.yaml"):
         pca_features,
         edge_index,
         n_epochs=config.training_epochs,
-        batch_size=config.batch_size,
         lr=config.learning_rate,
         lambda_spatial=config.spatial_regularization_weight,
         device=device,

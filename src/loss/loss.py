@@ -26,11 +26,10 @@ def spatial_vae_loss(
     latent_embeddings: torch.Tensor,
     edge_index: Optional[torch.Tensor] = None,
     lambda_spatial: float = 0.0,
+    beta: float = 1.0,
 ):
     if edge_index is None:
-        logging.warning(
-            "edge_index is None, spatial smoothness loss will be skipped."
-        )
+        logging.warning("edge_index is None, spatial smoothness loss will be skipped.")
 
     recon_loss = reconstruction_loss(reconstructed, original)
     kl_div = kl_divergence(mu, logvar)
@@ -41,5 +40,5 @@ def spatial_vae_loss(
         else original.new_zeros(())
     )
 
-    total = recon_loss + kl_div + lambda_spatial * spatial
+    total = recon_loss + beta * kl_div + lambda_spatial * spatial
     return total, recon_loss, kl_div, spatial

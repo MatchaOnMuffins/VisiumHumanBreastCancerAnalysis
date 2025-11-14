@@ -56,12 +56,12 @@ class Config:
         return self._config["training"]["epochs"]
 
     @property
-    def batch_size(self) -> int:
-        return self._config["training"]["batch_size"]
-
-    @property
     def learning_rate(self) -> float:
         return self._config["training"]["learning_rate"]
+
+    @property
+    def beta(self) -> float:
+        return self._config["training"]["beta"]
 
     @property
     def spatial_regularization_weight(self) -> float:

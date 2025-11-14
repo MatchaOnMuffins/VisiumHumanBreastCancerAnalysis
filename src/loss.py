@@ -1,6 +1,7 @@
 import torch.nn.functional as F
 from typing import Optional
 import torch
+import logging
 
 
 def spatial_smoothness_loss(latent_embeddings: torch.Tensor, edge_index: torch.Tensor):
@@ -26,6 +27,11 @@ def spatial_vae_loss(
     edge_index: Optional[torch.Tensor] = None,
     lambda_spatial: float = 0.0,
 ):
+    if edge_index is None:
+        logging.warning(
+            "edge_index is None, spatial smoothness loss will be skipped."
+        )
+
     recon_loss = reconstruction_loss(reconstructed, original)
     kl_div = kl_divergence(mu, logvar)
 

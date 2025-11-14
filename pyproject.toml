@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "pyyaml>=6.0.3",
     "scanpy>=1.11.5",
     "scipy>=1.16.3",
     "squidpy>=1.6.5",

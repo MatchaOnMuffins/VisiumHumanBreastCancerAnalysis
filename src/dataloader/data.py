@@ -28,12 +28,24 @@ def preprocess_expression(X, min_spots=200, n_top_genes=3000, n_pca_components=5
 
 def build_spatial_graph(coords, k=6):
     knn_model = NearestNeighbors(n_neighbors=k).fit(coords)
-    adjacency_matrix = knn_model.kneighbors_graph(coords, mode="connectivity")
-
-    sparse_coo = adjacency_matrix.tocoo()  # type: ignore
-    row_indices = torch.from_numpy(sparse_coo.row).long()
-    col_indices = torch.from_numpy(sparse_coo.col).long()
-    edge_index = torch.stack([row_indices, col_indices], dim=0)
-
-    is_not_self_loop = edge_index[0] != edge_index[1]
-    return edge_index[:, is_not_self_loop]
+    
+    # Get k-nearest neighbors directly to preserve distance-based ordering
+    distances, indices = knn_model.kneighbors(coords)
+    
+    # Build edge index by iterating through each node and its neighbors
+    src_list = []
+    dst_list = []
+    
+    for i in range(len(coords)):
+        for j in indices[i]:
+            # Skip self-loops
+            if i != j:
+                src_list.append(i)
+                dst_list.append(j)
+    
+    # Convert to torch tensors
+    src_tensor = torch.tensor(src_list, dtype=torch.long)
+    dst_tensor = torch.tensor(dst_list, dtype=torch.long)
+    edge_index = torch.stack([src_tensor, dst_tensor], dim=0)
+    
+    return edge_index

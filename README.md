@@ -34,6 +34,22 @@ uv run main.py
 ```
 
 
+## Loss function
+We utlize the following loss function in this work:
+
+$$
+\mathcal{L}
+=
+\|x - \hat{x}\|_2^2
+\;+\;
+\beta \cdot \tfrac{1}{2}
+\left(\mu^2 + e^{\log\sigma^2} - 1 - \log\sigma^2\right)
+\;+\;
+\lambda_{\text{spatial}} \cdot
+\frac{1}{|E|}\sum_{(u,v)\in E} \| z_u - z_v \|_2^2$$
+
+
+
 
 ## Results
 

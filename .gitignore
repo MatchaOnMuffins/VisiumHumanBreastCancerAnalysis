@@ -18,3 +18,7 @@ data/
 .claude/
 
 .ruff_cache/
+
+.threading
+
+.DS_Store

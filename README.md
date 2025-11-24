@@ -32,3 +32,20 @@ Finally, run the following to train the model
 ```
 uv run main.py
 ```
+
+
+
+## Results
+
+We observe distinct clusters and spatial element classification as indicated in the spatial clusters
+
+![](assets/spatial_clusters.png)
+
+
+We also observe proper latent space clustering
+
+![](assets/latent_space_umap.png)
+
+
+
+

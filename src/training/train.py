@@ -1,5 +1,5 @@
 import torch
-from ..loss.loss import spatial_vae_loss
+from ..loss.loss import spatial_vae_loss, vae_loss
 
 
 def train_model(
@@ -47,3 +47,47 @@ def train_model(
         _, _, _, latent_embeddings = model(data)
 
     return latent_embeddings.cpu().numpy()
+
+
+def train_model_nospatial(
+    model,
+    X,
+    n_epochs=50,
+    lr=1e-3,
+    device="cpu",
+    beta=1.0,
+):
+    model = model.to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    data = torch.from_numpy(X).to(device)
+    #edge_index = edge_index.to(device)
+
+    for epoch in range(n_epochs):
+        model.train()
+
+        reconstruction, mu, logvar, latent = model(data)
+        total_loss, recon_loss, kl_loss = vae_loss(
+            reconstruction,
+            data,
+            mu,
+            logvar,
+            latent,
+            beta=beta
+        )
+
+        optimizer.zero_grad()
+        total_loss.backward()
+        optimizer.step()
+
+        print(
+            f"Epoch {epoch + 1:03d} | "
+            f"Loss: {total_loss.item():.4f} (R:{recon_loss.item():.4f} KL:{kl_loss.item():.4f} S:{spatial_loss.item():.4f})"
+        )
+
+    model.eval()
+    with torch.no_grad():
+        _, _, _, latent_embeddings = model(data)
+
+    return latent_embeddings.cpu().numpy()
+

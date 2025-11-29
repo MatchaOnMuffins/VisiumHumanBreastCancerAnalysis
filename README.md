@@ -35,7 +35,7 @@ uv run main.py
 
 
 ## Loss function
-We utlize the following loss function in this work:
+We utlize the following loss function in this work for the spatial VAE:
 
 $$
 \mathcal{L}
@@ -46,9 +46,13 @@ $$
 \left(\mu^2 + e^{\log\sigma^2} - 1 - \log\sigma^2\right)
 \;+\;
 \lambda_{\text{spatial}} \cdot
-\frac{1}{|E|}\sum_{(u,v)\in E} \| z_u - z_v \|_2^2$$
+\frac{1}{|E|}\sum_{(u,v)\in E} \| z_u - z_v \|_2^2
+$$
 
 
+## Pipeline
+
+Expression is log normalized, and spatial features are engineered from coordinates by computing the fraction of nearest k neighbors of a given cell type.  
 
 
 ## Results

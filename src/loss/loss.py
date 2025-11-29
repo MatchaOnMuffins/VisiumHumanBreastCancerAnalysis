@@ -42,3 +42,17 @@ def spatial_vae_loss(
 
     total = recon_loss + beta * kl_div + lambda_spatial * spatial
     return total, recon_loss, kl_div, spatial
+
+
+def vae_loss(
+    reconstructed: torch.Tensor,
+    original: torch.Tensor,
+    mu: torch.Tensor,
+    logvar: torch.Tensor,
+    beta: float = 1.0,
+):
+    recon_loss = reconstruction_loss(reconstructed, original)
+    kl_div = kl_divergence(mu, logvar)
+
+    total = recon_loss + beta * kl_div
+    return total, recon_loss, kl_div

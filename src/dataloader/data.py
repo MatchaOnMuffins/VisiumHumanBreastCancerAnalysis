@@ -3,6 +3,8 @@ import torch
 import scanpy as sc
 import squidpy as sq
 from sklearn.neighbors import NearestNeighbors
+from sctypepy import run_sctype
+
 
 
 def load_visium_data(
@@ -37,3 +39,44 @@ def build_spatial_graph(coords, k=6):
 
     is_not_self_loop = edge_index[0] != edge_index[1]
     return edge_index[:, is_not_self_loop]
+
+def annotate_cell_types(adata, tissue="Kidney"):
+    sc.pp.neighbors(adata)
+    sc.tl.leiden(adata)
+    adata = run_sctype(adata, tissue_type=tissue, groupby="leiden")
+    return None
+
+def compute_cell_type_fractions(adata, k=6):
+    labels = adata.obs["sctype_classification"].values
+    unique_labels = np.unique(labels)
+
+    nbrs = NearestNeighbors(n_neighbors=k).fit(adata.obsm["spatial"])
+    _, indices = nbrs.kneighbors(adata.obsm["spatial"])
+
+    neighbor_fractions = []
+    for i in range(adata.n_obs):
+        neighbor_labels = labels[indices[i]]
+        fractions = [
+            np.sum(neighbor_labels == ulab) / k for ulab in unique_labels
+        ]
+        neighbor_fractions.append(fractions)
+
+    return np.array(neighbor_fractions), unique_labels
+
+def create_spatial_features(adata, k=6):
+    x_coords = adata.obsm["spatial"][:, 0]
+    y_coords = adata.obsm["spatial"][:, 1]
+
+    x_norm = (x_coords - x_coords.min()) / (x_coords.max() - x_coords.min())
+    y_norm = (y_coords - y_coords.min()) / (y_coords.max() - y_coords.min())
+    r_norm = np.sqrt(x_norm**2 + y_norm**2)
+
+    neighbor_comp, unique_labels = compute_cell_type_fractions(adata, k=k)
+
+    spatial_features = np.column_stack([x_norm, y_norm, r_norm, neighbor_comp])
+    feature_names = (
+        ["x_norm", "y_norm", "r_norm"] +
+        [f"nbr_frac_{lab}" for lab in unique_labels]
+    )
+
+    return spatial_features, feature_names

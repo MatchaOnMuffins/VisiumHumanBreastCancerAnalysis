@@ -1,0 +1,22 @@
+data:
+  data_dir: "data/"
+  counts_file: "Visium_Human_Breast_Cancer_filtered_feature_bc_matrix.h5"
+
+preprocessing:
+  min_spots_per_gene: 200
+  top_genes_count: 3000
+  pca_components: 20
+  spatial_neighbors: 6
+
+model:
+  latent_dimensions: 32
+  hidden_layer_dimensions: [256, 128]
+
+training:
+  epochs: 50
+  learning_rate: 0.001
+  spatial_regularization_weight: 0.1
+  beta: 1
+
+clustering:
+  n_neighbors: 15

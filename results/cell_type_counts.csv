@@ -4,12 +4,13 @@ PCA,Immune CTL,929
 PCA,Other epithelial,756
 PCA,Stroma fibroblasts,671
 PCA,Luminal epithelial,465
-sVAE,Luminal epithelial,2225
-sVAE,Unknown,1113
-sVAE,Immune CTL,666
-sVAE,Basal/myoepithelial,499
-sVAE,Other epithelial,395
-cVAE,Unknown,1895
-cVAE,Luminal epithelial,1561
-cVAE,Stroma fibroblasts,936
-cVAE,Endothelial,506
+sVAE,Luminal epithelial,1779
+sVAE,Unknown,1401
+sVAE,Stroma fibroblasts,744
+sVAE,Endothelial,560
+sVAE,Other epithelial,414
+cVAE,Unknown,1449
+cVAE,Luminal epithelial,1271
+cVAE,Other epithelial,1010
+cVAE,Immune CTL,847
+cVAE,Stroma fibroblasts,321

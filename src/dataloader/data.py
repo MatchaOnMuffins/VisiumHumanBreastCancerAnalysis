@@ -40,43 +40,66 @@ def build_spatial_graph(coords, k=6):
     is_not_self_loop = edge_index[0] != edge_index[1]
     return edge_index[:, is_not_self_loop]
 
-def annotate_cell_types(adata, tissue="Kidney"):
-    sc.pp.neighbors(adata)
-    sc.tl.leiden(adata)
-    adata = run_sctype(adata, tissue_type=tissue, groupby="leiden")
-    return None
+def annotate_unsupervised_domains(adata, n_pcs=50, resolution=0.5):
+    """
+    Runs PCA and Leiden clustering to produce unsupervised expression domains.
+    Stores them in adata.obs['expr_cluster'] as integer cluster IDs.
+    """
 
-def compute_cell_type_fractions(adata, k=6):
-    labels = adata.obs["sctype_classification"].values
+    # 1. PCA (assuming adata is preprocessed; otherwise add HVG/log1p)
+    sc.pp.pca(adata, n_comps=n_pcs)
+
+    # 2. Build KNN graph in PCA space
+    sc.pp.neighbors(adata, use_rep="X_pca")
+
+    # 3. Unsupervised clustering in PCA space
+    sc.tl.leiden(adata, resolution=resolution, key_added="expr_cluster")
+
+    # Convert to integer codes for easy indexing
+    adata.obs["expr_cluster"] = adata.obs["expr_cluster"].astype("category")
+    adata.obs["expr_cluster_id"] = adata.obs["expr_cluster"].cat.codes
+
+    return adata
+
+def compute_clusterID_fractions(adata, k=6):
+    """
+    Computes fractional composition of unsupervised cluster IDs
+    in the spatial neighborhood of each spot.
+    """
+
+    # Unsupervised cluster IDs (integer codes)
+    labels = adata.obs["expr_cluster_id"].values
     unique_labels = np.unique(labels)
+    n_clusters = len(unique_labels)
 
-    nbrs = NearestNeighbors(n_neighbors=k).fit(adata.obsm["spatial"])
-    _, indices = nbrs.kneighbors(adata.obsm["spatial"])
+    # kNN graph in spatial coordinates
+    coords = adata.obsm["spatial"]
+    nbrs = NearestNeighbors(n_neighbors=k).fit(coords)
+    _, indices = nbrs.kneighbors(coords)
 
-    neighbor_fractions = []
+    # Compute fraction vectors
+    neighbor_fractions = np.zeros((adata.n_obs, n_clusters))
+
     for i in range(adata.n_obs):
         neighbor_labels = labels[indices[i]]
-        fractions = [
-            np.sum(neighbor_labels == ulab) / k for ulab in unique_labels
-        ]
-        neighbor_fractions.append(fractions)
+        for j, lab in enumerate(unique_labels):
+            neighbor_fractions[i, j] = np.sum(neighbor_labels == lab) / k
 
-    return np.array(neighbor_fractions), unique_labels
+    return neighbor_fractions, unique_labels
 
 def create_spatial_features(adata, k=6):
-    x_coords = adata.obsm["spatial"][:, 0]
-    y_coords = adata.obsm["spatial"][:, 1]
+    """
+    Creates the final spatial conditioning feature matrix for the cVAE
+    using unsupervised clusterID neighbor fractions.
+    """
 
-    x_norm = (x_coords - x_coords.min()) / (x_coords.max() - x_coords.min())
-    y_norm = (y_coords - y_coords.min()) / (y_coords.max() - y_coords.min())
-    r_norm = np.sqrt(x_norm**2 + y_norm**2)
+    # 1. Get fractional cluster composition of spatial neighbors
+    neighbor_comp, unique_labels = compute_clusterID_fractions(adata, k=k)
 
-    neighbor_comp, unique_labels = compute_cell_type_fractions(adata, k=k)
+    # 2. Spatial features = just the fractional composition vector
+    spatial_features = neighbor_comp
 
-    spatial_features = np.column_stack([x_norm, y_norm, r_norm, neighbor_comp])
-    feature_names = (
-        ["x_norm", "y_norm", "r_norm"] +
-        [f"nbr_frac_{lab}" for lab in unique_labels]
-    )
+    # 3. Nice naming
+    feature_names = [f"unsupClusterFrac_{lab}" for lab in unique_labels]
 
     return spatial_features, feature_names

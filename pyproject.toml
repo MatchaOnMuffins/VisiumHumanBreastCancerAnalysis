@@ -11,6 +11,7 @@ dependencies = [
     "pyyaml>=6.0.3",
     "scanpy>=1.11.5",
     "scipy>=1.16.3",
+    "sctypepy>=0.1.0",
     "squidpy>=1.6.5",
     "torch",
 ]

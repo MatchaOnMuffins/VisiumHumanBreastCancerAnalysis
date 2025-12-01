@@ -13,11 +13,11 @@ from src.dataloader.data import (
     create_spatial_features
 )
 from src.model.model import SpatialVAE, ConditionalSpatialVAE
-from src.training.train import train_model
+from src.training.train import train_model, train_model_conditional
 from src.config.config import load_config
 
 
-def main(config_path: str = "config.yaml"):
+def main_svae(config_path: str = "config.yaml"):
     config = load_config(config_path)
     print(f"Loaded configuration from: {config_path}")
 
@@ -110,28 +110,30 @@ def main_cvae(config_path: str = "config.yaml"):
     edge_index = build_spatial_graph(spatial_coordinates, k=config.spatial_neighbors)
     print(f"   Graph edges: {edge_index.shape[1]}")
 
-    print("\n4. Training Spatial VAE...")
+    print("\n4. Training Conditional Spatial VAE...")
     model = ConditionalSpatialVAE(
-        in_dim=pca_features.shape[1],
+        x_dim=pca_features.shape[1],
         s_dim=spatial_features.shape[1],
         latent_dim=config.latent_dimensions,
-        hidden_dims=-config.hidden_layer_dimensions,
+        hidden_dims=config.hidden_layer_dimensions,
     )
-    embeddings = train_model(
+    embeddings = train_model_conditional(
         model,
         pca_features,
+        spatial_features,
         edge_index,
         n_epochs=config.training_epochs,
         lr=config.learning_rate,
         lambda_spatial=config.spatial_regularization_weight,
         device=device,
+        beta=config.beta,
     )
 
     print("\n5. Clustering and visualization...")
-    adata.obsm["X_spatial_vae"] = StandardScaler().fit_transform(embeddings)
+    adata.obsm["X_cvae"] = StandardScaler().fit_transform(embeddings)
 
     sc.pp.neighbors(
-        adata, use_rep="X_spatial_vae", n_neighbors=config.cluster_neighbors
+        adata, use_rep="X_cvae", n_neighbors=config.cluster_neighbors
     )
     sc.tl.leiden(adata)
     sc.tl.umap(adata)
@@ -148,9 +150,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config",
         type=str,
-        default="config.yaml",
-        help="Path to configuration YAML file (default: config.yaml)",
+        default="config_cvae.yaml",
+        help="Path to configuration YAML file (default: config_cvae.yaml)",
     )
     args = parser.parse_args()
 
-    main(config_path=args.config)
+    main_cvae(config_path=args.config)

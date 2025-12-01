@@ -1,0 +1,6 @@
+Mean sctype stability across embeddings (PCA/sVAE/cVAE): 0.7347
+
+Robustness across resolutions:
+  PCA:  0.8716
+  sVAE: 0.8548
+  cVAE: 0.6369

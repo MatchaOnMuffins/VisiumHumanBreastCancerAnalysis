@@ -1,6 +1,7 @@
 data:
-  data_dir: "data/"
-  counts_file: "Visium_Human_Breast_Cancer_filtered_feature_bc_matrix.h5"
+
+  data_dir: "/Users/wonderous_cat/school/fa25/bioinf593/final-proj/Visium_Human_Breast_Cancer"
+  counts_file: "filtered_feature_bc_matrix.h5"
 
 preprocessing:
   min_spots_per_gene: 200

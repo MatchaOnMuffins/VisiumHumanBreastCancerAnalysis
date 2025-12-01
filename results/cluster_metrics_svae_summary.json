@@ -1,0 +1,19 @@
+{
+  "sctype_mean_stability": 0.6933850551245406,
+  "metrics": [
+    {
+      "method": "PCA",
+      "silhouette": 0.04508056119084358,
+      "calinski_harabasz": 449.5873107910156,
+      "davies_bouldin": 1.5429038494660112,
+      "neighborhood_purity": 0.6245066013338777
+    },
+    {
+      "method": "sVAE",
+      "silhouette": 0.0904356837272644,
+      "calinski_harabasz": 651.3907470703125,
+      "davies_bouldin": 2.6732348569354922,
+      "neighborhood_purity": 0.6305634953042057
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+Method,Cell_Type,Count
+PCA,Unknown,2077
+PCA,Immune CTL,929
+PCA,Other epithelial,756
+PCA,Stroma fibroblasts,671
+PCA,Luminal epithelial,465
+sVAE,Luminal epithelial,2225
+sVAE,Unknown,1113
+sVAE,Immune CTL,666
+sVAE,Basal/myoepithelial,499
+sVAE,Other epithelial,395
+cVAE,Unknown,1895
+cVAE,Luminal epithelial,1561
+cVAE,Stroma fibroblasts,936
+cVAE,Endothelial,506

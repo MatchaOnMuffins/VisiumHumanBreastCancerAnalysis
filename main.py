@@ -19,27 +19,7 @@ from src.model.model import SpatialVAE, ConditionalSpatialVAE
 from src.training.train import train_model, train_model_conditional
 import pandas as pd
 
-
-def main_svae(config_path: str = "config.yaml"):
-    config = load_config(config_path)
-    print(f"Loaded configuration from: {config_path}")
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Using device: {device}")
-
-    print("\n1. Loading data...")
-    adata = load_visium_data(config.data_dir, config.counts_file)
-    expression_matrix = adata.X.toarray()  # type: ignore
-    spatial_coordinates = adata.obsm["spatial"].astype("float32")
-    print(
-        f"   Loaded {expression_matrix.shape[0]} spots, {expression_matrix.shape[1]} genes"
-    )
-
-    sc.tl.pca(adata)
-    sc.pp.neighbors(adata, use_rep="X_pca")
-    sc.tl.leiden(adata)
-
-    custom_db = pd.DataFrame(
+custom_db = pd.DataFrame(
         {
             "tissueType": ["Breast"] * 10,
             "cellName": [
@@ -70,13 +50,27 @@ def main_svae(config_path: str = "config.yaml"):
         }
     )
 
+
+def main_svae(config_path: str = "config.yaml"):
+    config = load_config(config_path)
+    print(f"Loaded configuration from: {config_path}")
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device}")
+
+    print("\n1. Loading data...")
+    adata = load_visium_data(config.data_dir, config.counts_file)
+    expression_matrix = adata.X.toarray()  # type: ignore
+    spatial_coordinates = adata.obsm["spatial"].astype("float32")
+    print(
+        f"   Loaded {expression_matrix.shape[0]} spots, {expression_matrix.shape[1]} genes"
+    )
+
+    sc.tl.pca(adata)
+    sc.pp.neighbors(adata, use_rep="X_pca")
+    sc.tl.leiden(adata)
     adata = run_sctype(adata, tissue_type="Breast", groupby="leiden", db=custom_db)
-
     print(adata.obs["sctype_classification"])
-
-    adata.obs["sctype_classification"]
-
-    # save csv
     adata.obs["sctype_classification"].to_csv("sctype_classification.csv")
 
     print("\n2. Preprocessing expression data...")
@@ -152,7 +146,13 @@ def main_cvae(config_path: str = "config.yaml"):
         n_top_genes=config.top_genes_count,
         n_pca_components=config.pca_components,
     )
-    annotate_cell_types(adata, tissue="Kidney")
+
+
+    sc.tl.pca(adata)
+    sc.pp.neighbors(adata, use_rep="X_pca")
+    sc.tl.leiden(adata)
+    adata = run_sctype(adata, tissue_type="Breast", groupby="leiden", db=custom_db)
+
     spatial_features, names = create_spatial_features(adata, k=6)
     adata.obsm["spatial_features"] = spatial_features
     adata.uns["spatial_feature_names"] = names

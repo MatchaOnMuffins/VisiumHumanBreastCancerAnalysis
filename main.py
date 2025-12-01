@@ -3,6 +3,7 @@
 import argparse
 
 import scanpy as sc
+import squidpy
 import torch
 from sctypepy import run_sctype
 from sklearn.preprocessing import StandardScaler
@@ -11,8 +12,6 @@ from src.dataloader.data import (
     build_spatial_graph,
     load_visium_data,
     preprocess_expression,
-    annotate_cell_types,
-    compute_cell_type_fractions,
     create_spatial_features,
 )
 from src.model.model import SpatialVAE, ConditionalSpatialVAE
@@ -58,7 +57,7 @@ def main_svae(config_path: str = "config.yaml"):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
-    print("\n1. Loading data...")
+    # print("\n1. Loading data...")
     adata = load_visium_data(config.data_dir, config.counts_file)
     expression_matrix = adata.X.toarray()  # type: ignore
     spatial_coordinates = adata.obsm["spatial"].astype("float32")
@@ -66,27 +65,23 @@ def main_svae(config_path: str = "config.yaml"):
         f"   Loaded {expression_matrix.shape[0]} spots, {expression_matrix.shape[1]} genes"
     )
 
+    # === Approach 1: Standard PCA-based clustering ===
     sc.tl.pca(adata)
     sc.pp.neighbors(adata, use_rep="X_pca")
-    sc.tl.leiden(adata)
-    adata = run_sctype(adata, tissue_type="Breast", groupby="leiden", db=custom_db)
-    print(adata.obs["sctype_classification"])
-    adata.obs["sctype_classification"].to_csv("sctype_classification.csv")
+    sc.tl.leiden(adata, key_added="leiden_pca")
+    adata = run_sctype(adata, tissue_type="Breast", groupby="leiden_pca", db=custom_db)
+    adata.obs["sctype_pca"] = adata.obs["sctype_classification"]
 
-    print("\n2. Preprocessing expression data...")
+    # === Approach 2: Spatial VAE-based clustering ===
+
     pca_features = preprocess_expression(
         expression_matrix,
         min_spots=config.min_spots_per_gene,
         n_top_genes=config.top_genes_count,
         n_pca_components=config.pca_components,
     )
-    print(f"   PCA shape: {pca_features.shape}")
-
-    print("\n3. Building spatial k-NN graph...")
     edge_index = build_spatial_graph(spatial_coordinates, k=config.spatial_neighbors)
-    print(f"   Graph edges: {edge_index.shape[1]}")
 
-    print("\n4. Training Spatial VAE...")
     model = SpatialVAE(
         in_dim=pca_features.shape[1],
         latent_dim=config.latent_dimensions,
@@ -102,27 +97,33 @@ def main_svae(config_path: str = "config.yaml"):
         device=device,
     )
 
-    print("\n5. Clustering and visualization...")
+
     adata.obsm["X_spatial_vae"] = StandardScaler().fit_transform(embeddings)
 
     sc.pp.neighbors(
         adata, use_rep="X_spatial_vae", n_neighbors=config.cluster_neighbors
     )
-    sc.tl.leiden(adata)
+    sc.tl.leiden(adata, key_added="leiden_svae")
 
-    print("\n   Clusters found:")
-    print(adata.obs["leiden"].value_counts())
 
-    print("\n   Saving cluster assignments to cluster_assignments.csv...")
-    adata.obs[["leiden"]].to_csv("cluster_assignments.csv")
+    adata = run_sctype(adata, tissue_type="Breast", groupby="leiden_svae", db=custom_db)
+    adata.obs["sctype_svae"] = adata.obs["sctype_classification"]
+    adata.obs[["leiden_pca", "leiden_svae", "sctype_pca", "sctype_svae"]].to_csv("cluster_assignments.csv")
 
     sc.tl.umap(adata)
 
-    print("\n6. Generating plots...")
-    sc.pl.spatial(adata, color="leiden", title="Spatial clusters")
-    sc.pl.umap(adata, color="leiden", title="UMAP of latent space")
+    # PCA-based results
+    squidpy.pl.spatial_scatter(adata, color="sctype_pca", title="PCA-based cell types")
+    sc.pl.umap(adata, color="sctype_pca", title="UMAP - PCA clustering")
 
-    print("\nDone!")
+    # Spatial VAE-based results
+    squidpy.pl.spatial_scatter(adata, color="sctype_svae", title="Spatial VAE-based cell types")
+    sc.pl.umap(adata, color="sctype_svae", title="UMAP - Spatial VAE clustering")
+
+    # Leiden clusters comparison
+    squidpy.pl.spatial_scatter(adata, color=["leiden_pca", "leiden_svae"], title=["PCA Leiden", "SVAE Leiden"])
+    sc.pl.umap(adata, color=["leiden_pca", "leiden_svae"], title=["PCA Leiden", "SVAE Leiden"])
+
 
 def main_cvae(config_path: str = "config.yaml"):
     config = load_config(config_path)
@@ -193,7 +194,7 @@ def main_cvae(config_path: str = "config.yaml"):
     sc.tl.umap(adata)
 
     print("\n6. Generating plots...")
-    sc.pl.spatial(adata, color="leiden", title="Spatial clusters")
+    squidpy.pl.spatial_scatter(adata, color="leiden", title="Spatial clusters")
     sc.pl.umap(adata, color="leiden", title="UMAP of latent space")
 
     print("\nDone!")
@@ -209,4 +210,5 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    main_cvae(config_path=args.config)
+    # main_cvae(config_path=args.config)
+    main_svae(config_path=args.config)

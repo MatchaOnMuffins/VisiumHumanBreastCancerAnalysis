@@ -39,7 +39,7 @@ def train_model(
 
         print(
             f"Epoch {epoch + 1:03d} | "
-            f"Loss: {total_loss.item():.4f} (R:{recon_loss.item():.4f} KL:{kl_loss.item():.4f})"
+            f"Loss: {total_loss.item():.4f} (R:{recon_loss.item():.4f} KL:{kl_loss.item():.4f}) S:{spatial_loss.item():.4f}"
         )
 
     model.eval()

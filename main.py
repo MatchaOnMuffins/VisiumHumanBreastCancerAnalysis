@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 
 import argparse
-import torch
-import scanpy as sc
-from sklearn.preprocessing import StandardScaler
 
+import scanpy as sc
+import torch
+from sctypepy import run_sctype
+from sklearn.preprocessing import StandardScaler
+from src.config.config import load_config
 from src.dataloader.data import (
+    build_spatial_graph,
     load_visium_data,
     preprocess_expression,
-    build_spatial_graph,
 )
 from src.model.model import SpatialVAE
 from src.training.train import train_model
-from src.config.config import load_config
+import pandas as pd
 
 
 def main(config_path: str = "config.yaml"):
@@ -29,6 +31,50 @@ def main(config_path: str = "config.yaml"):
     print(
         f"   Loaded {expression_matrix.shape[0]} spots, {expression_matrix.shape[1]} genes"
     )
+
+    sc.tl.pca(adata)
+    sc.pp.neighbors(adata, use_rep="X_pca")
+    sc.tl.leiden(adata)
+
+    custom_db = pd.DataFrame(
+        {
+            "tissueType": ["Breast"] * 10,
+            "cellName": [
+                "Smooth muscle",
+                "Endothelial",
+                "Luminal epithelial",
+                "Stroma fibroblasts",
+                "Endothelial subset",
+                "Mesenchymal progenitor",
+                "Stroma fibroblast subset",
+                "Basal/myoepithelial",
+                "Immune CTL",
+                "Other epithelial",
+            ],
+            "geneSymbolmore1": [
+                "ACTA2, MYH11, MYL9, MYLK, TAGLN",
+                "EMCN, ENG, PLVAP, SELE, SELP",
+                "KRT18, KRT19, KRT7, KRT8",
+                "COL1A1, COL1A2, COL3A1, COL6A1, COL6A2, COL6A3, ALDH1A1",
+                "EDN1, EFNB2, ELTD1, ESAM",
+                "APOE, CFD, STEAP4, CCL2, CEBPD, COL4A1, COL6A3, SNAI2, TGFB1",
+                "COL14A1, COL1A1, COL1A2, COL6A2, ALDH1A1",
+                "KRT5, KRT14, KRT17, ACTA2, TAGLN",
+                "C2, CD3D, CD7, CD8A, CD69, IL1B, TNF, GZMK",
+                "EPCAM, KRT6B, KRT15, KRT16, KRT81, KRT23",
+            ],
+            "geneSymbolmore2": [""] * 10,
+        }
+    )
+
+    adata = run_sctype(adata, tissue_type="Breast", groupby="leiden", db=custom_db)
+
+    print(adata.obs["sctype_classification"])
+
+    adata.obs["sctype_classification"]
+
+    # save csv
+    adata.obs["sctype_classification"].to_csv("sctype_classification.csv")
 
     print("\n2. Preprocessing expression data...")
     pca_features = preprocess_expression(
@@ -66,6 +112,13 @@ def main(config_path: str = "config.yaml"):
         adata, use_rep="X_spatial_vae", n_neighbors=config.cluster_neighbors
     )
     sc.tl.leiden(adata)
+
+    print("\n   Clusters found:")
+    print(adata.obs["leiden"].value_counts())
+
+    print("\n   Saving cluster assignments to cluster_assignments.csv...")
+    adata.obs[["leiden"]].to_csv("cluster_assignments.csv")
+
     sc.tl.umap(adata)
 
     print("\n6. Generating plots...")

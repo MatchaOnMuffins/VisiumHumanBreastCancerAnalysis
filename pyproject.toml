@@ -13,4 +13,6 @@ dependencies = [
     "scipy>=1.16.3",
     "squidpy>=1.6.5",
     "torch",
+    "sctypepy",
+    "scikit-learn"
 ]
